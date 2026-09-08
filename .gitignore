@@ -1,0 +1,19 @@
+# Never commit key material. This plugin never writes a key, but a stray copy
+# in the working tree is one `git add .` away from being permanent.
+*.key
+*.seed
+
+# Herdr writes a plugin's runtime state and config OUTSIDE the plugin root
+# (HERDR_PLUGIN_STATE_DIR / HERDR_PLUGIN_CONFIG_DIR). If either ever lands here
+# by mistake, it must not be committed: config may name a local agent.
+state/
+config
+
+# check-live writes its scratch here when run with a temporary node.
+tests/tmp/
+
+__pycache__/
+*.pyc
+*.bak
+*.log
+.DS_Store

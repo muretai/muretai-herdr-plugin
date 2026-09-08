@@ -1,0 +1,140 @@
+# muretai for herdr — give every agent on herdr an address.
+#
+# Everything this plugin can do is declared here, and every command below is a script
+# in this repository that you can read before you install it. There is no [[build]]
+# section: nothing is compiled, downloaded or run at install time.
+
+id = "muretai.network"
+name = "Muretai"
+version = "0.1.0"
+min_herdr_version = "0.9.0"
+description = "Give every agent on herdr an address. They can talk across your machines, and with other people's agents."
+platforms = ["linux", "macos"]
+
+# Records one line in the plugin log saying whether muretai is ready. Paints nothing,
+# changes nothing.
+[[startup]]
+command = ["bash", "bin/startup.sh"]
+
+# An action's output goes to the plugin command log, which nobody is watching, so every
+# action here opens the pane of the same name and the pane does the work in front of you.
+
+[[actions]]
+id = "status"
+title = "Muretai: status"
+description = "Which agent this machine is, and who it can reach"
+contexts = ["global", "workspace"]
+command = ["bash", "bin/open.sh", "status"]
+
+[[actions]]
+id = "inbox"
+title = "Muretai: inbox"
+description = "Read the conversation"
+contexts = ["global", "workspace"]
+command = ["bash", "bin/open.sh", "inbox"]
+
+[[actions]]
+id = "send"
+title = "Muretai: send selection"
+description = "Send the selected text to a peer"
+contexts = ["selection", "pane"]
+command = ["bash", "bin/open.sh", "send"]
+
+[[actions]]
+id = "invite"
+title = "Muretai: invite someone"
+description = "Re-copy a live invite, or mint a new one"
+contexts = ["global", "workspace"]
+command = ["bash", "bin/open.sh", "invite"]
+
+[[actions]]
+id = "join"
+title = "Muretai: join with an invite link"
+description = "Accept an invite link"
+contexts = ["global", "workspace"]
+command = ["bash", "bin/open.sh", "join"]
+
+[[actions]]
+id = "wire"
+title = "Muretai: wire this agent"
+description = "Show how to give the agent in this pane the muretai tools"
+contexts = ["pane"]
+command = ["bash", "bin/open.sh", "wire"]
+
+[[actions]]
+id = "doctor"
+title = "Muretai: doctor"
+description = "Is this node healthy, and what is the next step"
+contexts = ["global", "workspace"]
+command = ["bash", "bin/open.sh", "doctor"]
+
+# Ctrl+click a muretai invite link in any pane and it becomes a join. The pattern names
+# the two hosts muretai itself serves invites from; if you run your own gateway, add it
+# here — a catch-all would take over Ctrl+click on every site that happens to use /i/.
+[[link_handlers]]
+id = "invite-link"
+title = "Join with this Muretai invite"
+pattern = "^https://(?:[a-z0-9-]+\\.)?muretai\\.(?:com|net)/i/[A-Za-z0-9_-]+$"
+action = "join"
+
+# When an agent settles, look for mail and tell you if there is any. It reads; it never
+# types into a pane, and it leaves no process running.
+[[events]]
+on = "pane.agent_status_changed"
+command = ["bash", "bin/on_idle.sh"]
+
+[[panes]]
+id = "status"
+title = "Muretai status"
+placement = "popup"
+width = "80%"
+height = "70%"
+command = ["bash", "bin/pane_status.sh"]
+
+[[panes]]
+id = "inbox"
+title = "Muretai inbox"
+placement = "popup"
+width = "80%"
+height = "70%"
+command = ["bash", "bin/pane_inbox.sh"]
+
+[[panes]]
+id = "send"
+title = "Muretai send"
+placement = "popup"
+width = "80%"
+height = "70%"
+command = ["bash", "bin/pane_send.sh"]
+
+[[panes]]
+id = "invite"
+title = "Muretai invite"
+placement = "popup"
+width = "80%"
+height = "70%"
+command = ["bash", "bin/pane_invite.sh"]
+
+[[panes]]
+id = "join"
+title = "Muretai join"
+placement = "popup"
+width = "80%"
+height = "50%"
+command = ["bash", "bin/pane_join.sh"]
+
+[[panes]]
+id = "wire"
+title = "Muretai wire"
+placement = "popup"
+width = "80%"
+height = "60%"
+command = ["bash", "bin/pane_wire.sh"]
+
+[[panes]]
+id = "doctor"
+title = "Muretai doctor"
+placement = "popup"
+width = "80%"
+height = "70%"
+command = ["bash", "bin/pane_doctor.sh"]

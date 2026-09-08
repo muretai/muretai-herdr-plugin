@@ -1,0 +1,45 @@
+# What was measured, and when
+
+Everything this plugin assumes about herdr was checked against a real installation
+rather than read from the documentation. Each line is dated, because each is a
+version-pinned assumption and herdr moves fast.
+
+**Measured 2026-09-08 against herdr 0.9.0, socket protocol 22, on macOS.**
+The herdr website advertised 0.8.2 that day, so `min_herdr_version` comes from the
+binary, not from the docs.
+
+## Answers the documentation does not give
+
+| Question | What the installation said |
+|---|---|
+| Do plugin event hooks accept `pane.agent_status_changed`? The docs only ever show `worktree.created`. | **Yes.** `herdr plugin link` returned and `herdr plugin list --json` reported `"warnings": null`. An unrecognised event name would have been collected there as a non-fatal warning, so an empty warning list is the proof. |
+| What values may an action's `contexts` take? The docs only show `workspace`. | Five: `global`, `workspace`, `tab`, `pane`, `selection`. All seven actions registered with the values declared here. |
+| What does an action actually receive? | `workspace_id`, `workspace_label`, `workspace_cwd`, `tab_id`, `tab_label`, `focused_pane_id`, `focused_pane_cwd`, `focused_pane_agent`, `focused_pane_status`, `selected_text`, `invocation_source`, `correlation_id`, `clicked_url`, `link_handler_id`. Fields are omitted when they do not apply, so `focused_pane_agent` is simply absent when no agent is running in the focused pane. |
+| Where does an action's output go? | To the plugin command log, not to the screen. Nobody is watching that log. This is why every action here opens a pane and the pane does the work. |
+| Is a popup a pane? | No. It does not appear in `herdr pane list`, has no pane id, and does not take part in the pane or agent APIs. It is a session-modal, and it closes when its command exits — which is why the panes here wait for a keypress before returning. |
+| Do custom sidebar labels appear on their own? | No. Sidebar rows are configured (`sidebar.rows_by_agent`), so a label a plugin reports is invisible until the row layout names it. That is why this plugin paints nothing in the sidebar and puts everything in panes instead. |
+| Which socket does the CLI use? | The documentation says `~/.config/herdr/herdr.sock`; the file present after install is `herdr-client.sock`. Nothing here opens a socket — `HERDR_BIN_PATH` is the contract, and it is also the only one that works on Windows named pipes. |
+
+## The muretai side
+
+| Question | What the installation said |
+|---|---|
+| Is there a `muretai` command on PATH? | **No**, after a standard install. The only guaranteed form is `python3 <node>/operator_cli.py`, preferring `<node>/.venv/bin/python` when it exists. |
+| What happens if the agent name is wrong? | `operator_cli.py --as <typo>` does not fail. It creates a new identity with an empty inbox and reports it as yours. Hence the key-file guard in `bin/common.sh`, which runs before every command. |
+| Does reading the inbox disturb turn-mode delivery? | **No, and this was measured.** Before: cursor 264. After a full `inbox --json` that drained 1,094 messages: cursor 264, file mtime unchanged. This is the reason `bin/on_idle.sh` reads the inbox instead of running `turn-check`, which would have advanced that cursor and marked mail as delivered to a log nobody reads. |
+| Does `invite create` fail loudly? | No. It exits 0 and prints the failure. So the invite pane offers the free `invite list` first and only mints after you say yes. |
+
+## A bug the checker caught, on the day it was written
+
+The first version of `tests/check-live.sh` proved that an unknown agent name is refused
+by setting `MURETAI_AS` to a name that does not exist and expecting a refusal. It got
+one, and the check was wrong anyway: the plugin config file outranks that variable, so
+the probe never reached the guard — it resolved the configured agent and refused nothing.
+A check that cannot fail is worse than no check. It now runs against an empty config
+directory, and a second check exercises the key-file guard directly.
+
+## Still unverified
+
+- Ctrl+click actually firing the link handler. The pattern and the action are registered
+  and the environment variables are real; the click itself needs a person at a keyboard.
+- Linux. Everything above was measured on macOS.
