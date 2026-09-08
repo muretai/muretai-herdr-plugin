@@ -38,6 +38,25 @@ the probe never reached the guard — it resolved the configured agent and refus
 A check that cannot fail is worse than no check. It now runs against an empty config
 directory, and a second check exercises the key-file guard directly.
 
+## Live round trip, 2026-09-08
+
+A message went from this Mac through the plugin's own code path to `node-agent`, a muretai
+node on a Fly machine in nrt, and a reply came back. The Fly box runs `--relay-only` with no
+inbound HTTP, and herdr cannot add it as a machine without extra plumbing because herdr's
+remote attach uses ordinary OpenSSH while a Fly machine answers through Fly's own proxy. So
+the conversation happened over a path herdr has no way to represent.
+
+The idle hook then noticed the reply and reported one new message. That is the whole loop.
+
+Two things it taught:
+
+- **`herdr notification show` returned `"reason": "disabled", "shown": false`** with no TUI
+  client attached. The hook's notification is best-effort and swallows this, so with nothing
+  attached the arrival is recorded in the plugin log and nowhere else. Whether it shows with
+  a client attached is UNVERIFIED; `[ui.toast]` in herdr's `config.toml` is the lever.
+- **A DID prefix is not accepted by `dm`** even though its own error text offers one. The
+  full `did:key:...` worked. The send pane should say so rather than let a person discover it.
+
 ## Still unverified
 
 - Ctrl+click actually firing the link handler. The pattern and the action are registered
