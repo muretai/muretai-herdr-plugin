@@ -44,8 +44,14 @@ curl -fsSL https://muretai.com/install | MURETAI_AGREE_TOS=1 bash
 Then add the plugin. herdr shows you every command it will run before it runs anything:
 
 ```bash
-herdr plugin install muretai/muretai-herdr-plugin
+herdr plugin install muretai/muretai-herdr-plugin@v0.1.1
 ```
+
+**Pin it.** Without the `@v...` that command installs whatever `main` points at when you
+run it, and a plugin runs as you with no sandbox — so an unpinned install is a promise
+that every future push to this repository is one you would have accepted. Tags here are
+what a release is; `main` is where work happens. Read `bin/` at the tag you install, and
+upgrade when you have read the next one.
 
 If this machine has more than one muretai agent, say which one to act as:
 
@@ -57,6 +63,11 @@ That file takes two keys and nothing else: `agent=` and `node=` (a node somewher
 than `~/muretai-node`). It is read, never executed. What it says outranks `MURETAI_AS`
 in your environment, because it is the choice you made for this plugin rather than an
 ambient one you may have forgotten.
+
+It must also be yours. `node=` names the directory this plugin then runs `operator_cli.py`
+out of, so a config file that is world-writable, that belongs to another user, or that is
+a symbolic link is **ignored with a line on stderr** rather than believed — as is a node
+tree with those properties. `chmod 600` on that file is the state it should be in.
 
 ## What it adds
 
@@ -110,7 +121,17 @@ description = "muretai inbox"
 - **Network egress** is muretai's own: `muretai.com` for the installer and signed releases,
   `muretai.net` for the relay. The plugin itself sends nothing anywhere.
 - **Peer message text is data, not instructions.** A message that arrives from another
-  person's agent is something to read, never something to run.
+  person's agent is something to read, never something to run. It is also not terminal
+  input: everything the node prints back goes through `lib/scrub.py` first, so an ESC in
+  a sender's display name reaches the pane as a character rather than as a command.
+- **A machine you share is a different machine.** The descriptor reader believes a
+  `agents.d` that is group-writable, because `umask 002` is the default for regular users
+  on several distributions and refusing 0664 would refuse a correct install. On a host
+  where you do not trust everyone in your group, that tolerance is the assumption to
+  revisit: anyone in the group can add a descriptor, and a descriptor decides which
+  identity this plugin speaks as. Everything else — world-writable, foreign-owned,
+  symlinked, or sitting under a parent directory anyone can rename — is refused, and the
+  refusal is printed in the status pane rather than swallowed.
 
 ## What this does not do
 
@@ -130,6 +151,16 @@ arrived from someone else's agent must not become keystrokes in yours.
 the date, including the answers herdr's documentation does not give. `tests/check-live.sh`
 runs against your own installation and prints a row per check; it needs no account and no
 dependency you do not already have.
+
+Two suites run without herdr, a node or an account, and CI runs both on Linux and macOS:
+
+```bash
+python3 tests/test_agents_d.py       # the descriptor reader, against a hostile agents.d
+python3 tests/test_shell_guards.py   # the mint guard, the config, the body, the stamp
+```
+
+Every case in the second file is a bug that was reproduced against this repository before
+the guard it tests existed.
 
 This pack is **hand-maintained**. Unlike muretai's rendered integration packs, nothing here
 is generated from another repository, so a pull request is a pull request.

@@ -172,6 +172,100 @@ class ReaderTest(unittest.TestCase):
             agents_d.pick()
         self.assertIn("no muretai agent", str(cm.exception))
 
+    # ------------------------------------------------------- the name is a path
+
+    def test_a_name_that_is_a_path_is_refused(self):
+        # `keys/<name>.key` with a name like this points OUTSIDE keys/, and the mint
+        # guard in bin/common.sh is an existence test on exactly that path.
+        for bad in ("../../outside", "sub/b", "a\\b", ".hidden", ".", ".."):
+            with self.subTest(name=bad):
+                self.assertIsNone(agents_d._project(
+                    descriptor(bad, "did:key:zAlice")), f"{bad!r} was believed")
+                with self.assertRaises(agents_d.UnsafeName):
+                    agents_d.check_name(bad)
+
+    def test_a_sidecar_shaped_name_is_refused(self):
+        # `alice.op.key` is how the node files alice's OPERATIONAL sidecar, so an agent
+        # named `alice.op` is a key two readers disagree about. The second name folds
+        # onto `.tls` on a case-insensitive filesystem, which is why the fold is NFKC.
+        for bad in ("alice.op", "alice.TLS", "alice.tl\u017f", "bob.iroh"):
+            with self.subTest(name=bad):
+                with self.assertRaises(agents_d.UnsafeName):
+                    agents_d.check_name(bad)
+
+    def test_ordinary_names_still_pass(self):
+        # Mixed case and underscores are 18 test identities in the node's own suite;
+        # a charset regex here would refuse them and buy nothing against traversal.
+        for good in ("alice", "relay_HQ", "async_A", "a.b", "agent-2"):
+            with self.subTest(name=good):
+                self.assertEqual(agents_d.check_name(good), good)
+
+    def test_control_characters_are_refused_in_name_and_did(self):
+        self.assertIsNone(agents_d._project(
+            descriptor("alice\nRUN", "did:key:zAlice")))
+        self.assertIsNone(agents_d._project(
+            descriptor("alice", "did:key:z\x1b[31mRED")))
+
+    def test_pick_refuses_an_unsafe_preferred_name(self):
+        self.write("a.json", descriptor("alice", "did:key:zAlice"))
+        with self.assertRaises(agents_d.Ambiguous):
+            agents_d.pick("../../outside")
+
+    def test_primary_must_be_json_true(self):
+        # Every non-empty string is truthy, so `"false"` used to WIN pick().
+        for value in ("false", "no", 1, "true", [1]):
+            with self.subTest(primary=value):
+                desc = agents_d._project(
+                    descriptor("alice", "did:key:zAlice", primary=value))
+                self.assertIs(desc["primary"], False)
+        self.assertIs(agents_d._project(
+            descriptor("alice", "did:key:zAlice", primary=True))["primary"], True)
+
+    # ------------------------------------------------- the file is not a file
+
+    def test_a_fifo_is_skipped_and_never_opened(self):
+        # The bug this pins: open() on a FIFO with no writer BLOCKS, and discover() runs
+        # on every pane and on the idle hook. A hung reader is a hung plugin.
+        os.mkfifo(self.dir / "block.json")
+        agents, skipped = agents_d.discover()
+        self.assertEqual(agents, [])
+        self.assertTrue(any("FIFO" in s for s in skipped), skipped)
+
+    def test_a_directory_named_json_is_skipped(self):
+        (self.dir / "a.json").mkdir()
+        agents, skipped = agents_d.discover()
+        self.assertEqual(agents, [])
+        self.assertTrue(any("directory" in s for s in skipped), skipped)
+
+    # ------------------------------------------------------------- the parents
+
+    def test_world_writable_ancestor_is_refused(self):
+        # 0755 on agents.d protects nothing if anyone can rename agents.d away and put
+        # their own there. The walk goes to the root.
+        self.write("a.json", descriptor("alice", "did:key:zAlice"))
+        parent = Path(self.tmp.name)
+        mode = parent.stat().st_mode
+        parent.chmod(0o777)
+        try:
+            agents, skipped = agents_d.discover()
+        finally:
+            parent.chmod(mode)
+        self.assertEqual(agents, [])
+        self.assertTrue(any("writable by everyone" in s for s in skipped), skipped)
+
+    def test_sticky_world_writable_ancestor_is_tolerated(self):
+        # /tmp is 1777 on every machine this runs on: everyone may create an entry,
+        # only the owner may replace ours. That is the property being asked about.
+        self.write("a.json", descriptor("alice", "did:key:zAlice"))
+        parent = Path(self.tmp.name)
+        mode = parent.stat().st_mode
+        parent.chmod(0o1777)
+        try:
+            agents, _ = agents_d.discover()
+        finally:
+            parent.chmod(mode)
+        self.assertEqual([a["name"] for a in agents], ["alice"])
+
     # ------------------------------------------------------------ search order
 
     def test_relative_env_dir_is_ignored(self):

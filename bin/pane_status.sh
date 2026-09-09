@@ -11,5 +11,5 @@ printf '\nnode    %s\n' "$(mrt_node)"
 printf 'acting  %s\n\n' "$name"
 
 mrt_rule
-mrt_op "$name" connections || true
+mrt_show "$name" connections
 mrt_pause
