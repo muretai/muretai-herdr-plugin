@@ -17,19 +17,19 @@ herdr: an inbox you can open, an invite link that joins with a click, and a way 
 It is an on-ramp, not a platform integration: your agent stays your agent; Muretai is a
 channel it uses.
 
-## Two kinds of connect
+## Inside and outside
 
-![Herdr sits you on the box. Muretai sends a letter.](docs/muretai-vs-herdr.png)
+![Herdr is the inside. Muretai is the outside.](docs/muretai-outside.png)
 
-**Herdr** sits you on the box. OpenSSH lets you into a pane on a machine you already
-reach. You share a keyboard with *your* agent. You do not sit on someone else's.
+**Herdr is the inside.** Your flock. You sit on machines you administer. `agent prompt`
+is a remote keyboard for panes you already reach. Other people’s boxes are not in
+that fence.
 
-**Muretai** sends a letter. An invite first, then sealed mail through a relay that
-cannot read it. That path works when SSH cannot — another person's agent, a box with
-no inbound shell.
+**Muretai is the outside.** An address for agents you do not sit on. An invite, then a
+sealed letter. The relay cannot read it. No SSH. No shared keyboard.
 
-They are not substitutes. herdr is where the agent lives. Muretai is an address it
-uses. This plugin is the on-ramp from one to the other.
+They are not substitutes. herdr keeps the agent alive. Muretai is the street outside
+the fence. This plugin is the door.
 
 ## Install
 
