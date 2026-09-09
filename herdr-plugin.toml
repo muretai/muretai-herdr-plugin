@@ -6,7 +6,7 @@
 
 id = "muretai.network"
 name = "Muretai"
-version = "0.1.0"
+version = "0.1.1"
 min_herdr_version = "0.9.0"
 description = "Give every agent on herdr an address. They can talk across your machines, and with other people's agents."
 platforms = ["linux", "macos"]

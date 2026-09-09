@@ -1,0 +1,45 @@
+# The suite this repository can run without a herdr, a node or an account.
+#
+# It exists because of one line in the README: a herdr plugin is ordinary code running
+# as you. `main` is what `herdr plugin install muretai/muretai-herdr-plugin` fetches, so
+# a push to main is the next install on somebody's machine. This is the least that can
+# stand between those two facts.
+#
+# tests/check-live.sh is deliberately NOT here: it checks YOUR installation, and a CI
+# runner has neither.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        # The reader claims 3.9+; the oldest and the newest are the ones that break it.
+        python: ["3.9", "3.13"]
+        exclude:
+          # 3.9 has no arm64 build for the macOS runner image.
+          - os: macos-latest
+            python: "3.9"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: shell syntax
+        run: |
+          for f in bin/*.sh tests/*.sh; do bash -n "$f"; done
+      - name: the descriptor reader
+        run: python3 tests/test_agents_d.py
+      - name: the guards that live in bash
+        run: python3 tests/test_shell_guards.py

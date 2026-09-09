@@ -12,6 +12,9 @@
 # So this hook does one thing: it notices, and it tells the human. It never types into a
 # pane, and it starts no process that outlives it. There is no timer here: the only
 # thing that wakes it is an event from the herdr server the owner is already running.
+#
+# It is also the only thing here that runs WITHOUT anybody watching, which is what makes
+# its two state files worth guarding: see mrt_state_write in common.sh.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 state="${HERDR_PLUGIN_STATE_DIR:-}"
@@ -31,13 +34,19 @@ print(d.get("agent_status", "") if isinstance(d, dict) else "")
 [ "$status" = "idle" ] || exit 0
 
 # Rate limit. Several panes settling at once is one interesting moment, not five.
+#
+# `last` is READ as a number and not merely used as one: `$(( now - $last ))` on a stamp
+# somebody else wrote is an expression, not an integer, and while `set -u` turns that
+# into an abort rather than an execution, an abort here is still a hook that stopped
+# working for a reason nobody can see.
 stamp="$state/last_check"
 now="$(date +%s)"
-if [ -f "$stamp" ]; then
+if [ -f "$stamp" ] && [ ! -L "$stamp" ]; then
     last="$(cat "$stamp" 2>/dev/null || echo 0)"
-    [ $(( now - ${last:-0} )) -ge 60 ] || exit 0
+    case "$last" in ''|*[!0-9]*) last=0 ;; esac
+    [ $(( now - last )) -ge 60 ] || exit 0
 fi
-printf '%s\n' "$now" > "$stamp"
+mrt_state_write "$stamp" "$now" || exit 0
 
 name="$(mrt_agent 2>/dev/null)" || exit 0
 seen_file="$state/last_message_id"
@@ -47,28 +56,46 @@ seen_file="$state/last_message_id"
 first_run=0
 [ -f "$seen_file" ] || first_run=1
 seen="$(cat "$seen_file" 2>/dev/null || echo 0)"
+case "$seen" in ''|*[!0-9]*) seen=0 ;; esac
 
+# The label is a PEER's chosen display name. It reaches a notification and a log line,
+# so scrub.clean_field flattens it to one short line of printable text first.
 summary="$(mrt_op "$name" inbox --json 2>/dev/null | "$(mrt_python)" -c '
 import json, sys
+sys.path.insert(0, sys.argv[2])
+from scrub import clean_field
 try: d = json.load(sys.stdin)
 except Exception: sys.exit(0)
-seen = int(sys.argv[1] or 0)
-latest = d.get("latest_id", 0)
-new = [m for m in d.get("messages", [])
-       if m.get("direction") == "in" and int(m.get("id", 0)) > seen]
+
+
+def num(v):
+    try: return int(v)
+    except (TypeError, ValueError): return 0
+
+
+seen = num(sys.argv[1])
+latest = num(d.get("latest_id", 0))
+new = [m for m in d.get("messages", []) if isinstance(m, dict)
+       and m.get("direction") == "in" and num(m.get("id", 0)) > seen]
 if not new:
     print(f"0 {latest}")
     sys.exit(0)
-who = sorted({(m.get("sender_label") or m.get("peer_name") or "someone") for m in new})
+who = sorted({clean_field(str(m.get("sender_label") or m.get("peer_name") or "someone"), 40)
+              for m in new})
 label = who[0] if len(who) == 1 else f"{len(who)} peers"
 print(f"{len(new)} {latest} {label}")
-' "$seen")" || exit 0
+' "$seen" "$PLUGIN_ROOT/lib")" || exit 0
 
-set -- $summary
-count="${1:-0}"; latest="${2:-0}"; shift 2 || true; who="${*:-}"
-printf '%s\n' "$latest" > "$seen_file"
+# `read`, not `set -- $summary`: an unquoted expansion is also a GLOB, and the third
+# field is a name a peer chose. A sender_label of `*` used to list the pane's working
+# directory into the notification.
+read -r count latest who <<<"$summary"
+count="${count:-0}"; latest="${latest:-0}"; who="${who:-someone}"
+case "$latest" in ''|*[!0-9]*) latest=0 ;; esac
+case "$count" in ''|*[!0-9]*) count=0 ;; esac
+mrt_state_write "$seen_file" "$latest" || exit 0
 [ "$first_run" -eq 0 ] || exit 0
-[ "${count:-0}" -gt 0 ] || exit 0
+[ "$count" -gt 0 ] || exit 0
 
 mrt_herdr notification show "Muretai" \
     --body "$count new message(s) from ${who}" --sound request >/dev/null 2>&1 || true

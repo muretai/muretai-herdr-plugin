@@ -16,5 +16,5 @@ else
 fi
 
 printf '\n'
-mrt_op "$name" invite accept "$link" || true
+mrt_show "$name" invite accept "$link"
 mrt_pause
