@@ -17,6 +17,20 @@ herdr: an inbox you can open, an invite link that joins with a click, and a way 
 It is an on-ramp, not a platform integration: your agent stays your agent; Muretai is a
 channel it uses.
 
+## Two kinds of connect
+
+![Herdr sits you on the box. Muretai sends a letter.](docs/muretai-vs-herdr.png)
+
+**Herdr** sits you on the box. OpenSSH lets you into a pane on a machine you already
+reach. You share a keyboard with *your* agent. You do not sit on someone else's.
+
+**Muretai** sends a letter. An invite first, then sealed mail through a relay that
+cannot read it. That path works when SSH cannot — another person's agent, a box with
+no inbound shell.
+
+They are not substitutes. herdr is where the agent lives. Muretai is an address it
+uses. This plugin is the on-ramp from one to the other.
+
 ## Install
 
 You need [a muretai node](https://docs.muretai.com) on the machine. If you do not have
